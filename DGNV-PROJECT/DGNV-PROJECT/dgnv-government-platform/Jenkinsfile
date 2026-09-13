@@ -40,13 +40,16 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                bat 'powershell -NoProfile -Command "$deadline=(Get-Date).AddMinutes(3); do { Start-Sleep -Seconds 10; $ok=$true; foreach($u in @('http://localhost:8761/actuator/health','http://localhost:6001/actuator/health','http://localhost:6002/actuator/health','http://localhost:6003/actuator/health','http://localhost:9100/actuator/health','http://localhost:9095/actuator/health')) { try { $r=Invoke-RestMethod $u -TimeoutSec 5; if($r.status -ne 'UP'){$ok=$false} } catch {$ok=$false} }; if($ok){ exit 0 } } while((Get-Date) -lt $deadline); docker compose ps; exit 1"'
+                bat '''
+                    powershell -NoProfile -Command "$services=@(\"dgnv-discovery\",\"dgnv-auth\",\"dgnv-user\",\"dgnv-request\",\"dgnv-gateway\",\"dgnv-integration\"); $deadline=(Get-Date).AddMinutes(3); do { $bad=@(); foreach($s in $services) { $status=docker inspect --format=\"{{.State.Health.Status}}\" $s 2>$null; if($status -ne \"healthy\") { $bad += $s } }; if($bad.Count -eq 0) { Write-Host \"All DGNV services are healthy.\"; exit 0 }; Write-Host \"Waiting for: $($bad -join ', ')\"; Start-Sleep -Seconds 10 } while((Get-Date) -lt $deadline); docker compose ps; exit 1"
+                '''
             }
         }
     }
 
     post {
         failure {
+            bat 'docker compose ps'
             bat 'docker compose logs --tail=100'
         }
     }
