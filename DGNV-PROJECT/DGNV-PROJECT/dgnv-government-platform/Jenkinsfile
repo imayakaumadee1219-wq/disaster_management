@@ -22,26 +22,33 @@ pipeline {
 
         stage('Build Images') {
             steps {
-                bat 'docker compose build --pull'
+                dir('DGNV-PROJECT/DGNV-PROJECT/dgnv-government-platform') {
+                    bat 'docker compose build --pull'
+                }
             }
         }
 
         stage('Deploy') {
             steps {
-                bat 'docker compose up -d'
+                dir('DGNV-PROJECT/DGNV-PROJECT/dgnv-government-platform') {
+                    bat 'docker compose down'
+                    bat 'docker compose up -d'
+                }
             }
         }
 
         stage('Show Services') {
             steps {
-                bat 'docker compose ps'
+                dir('DGNV-PROJECT/DGNV-PROJECT/dgnv-government-platform') {
+                    bat 'docker compose ps'
+                }
             }
         }
 
         stage('Health Check') {
             steps {
                 bat '''
-                    powershell -NoProfile -Command "$services=@(\"dgnv-discovery\",\"dgnv-auth\",\"dgnv-user\",\"dgnv-request\",\"dgnv-gateway\",\"dgnv-integration\"); $deadline=(Get-Date).AddMinutes(3); do { $bad=@(); foreach($s in $services) { $status=docker inspect --format=\"{{.State.Health.Status}}\" $s 2>$null; if($status -ne \"healthy\") { $bad += $s } }; if($bad.Count -eq 0) { Write-Host \"All DGNV services are healthy.\"; exit 0 }; Write-Host \"Waiting for: $($bad -join ', ')\"; Start-Sleep -Seconds 10 } while((Get-Date) -lt $deadline); docker compose ps; exit 1"
+                    powershell -NoProfile -Command "$services=@(\"dgnv-discovery\",\"dgnv-auth\",\"dgnv-user\",\"dgnv-request\",\"dgnv-gateway\",\"dgnv-integration\"); $deadline=(Get-Date).AddMinutes(3); do { $bad=@(); foreach($s in $services) { $status=docker inspect --format=\"{{.State.Health.Status}}\" $s 2>$null; if($status -ne \"healthy\") { $bad += $s } }; if($bad.Count -eq 0) { Write-Host \"All DGNV services are healthy.\"; exit 0 }; Write-Host \"Waiting for: $($bad -join ', ')\"; Start-Sleep -Seconds 10 } while((Get-Date) -lt $deadline); docker ps; exit 1"
                 '''
             }
         }
@@ -49,8 +56,10 @@ pipeline {
 
     post {
         failure {
-            bat 'docker compose ps'
-            bat 'docker compose logs --tail=100'
+            dir('DGNV-PROJECT/DGNV-PROJECT/dgnv-government-platform') {
+                bat 'docker compose ps'
+                bat 'docker compose logs --tail=100'
+            }
         }
     }
 }
